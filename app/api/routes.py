@@ -52,3 +52,10 @@ def convert_excel():
                 os.remove(pdf_path)
     
     return jsonify({'error': 'Invalid file type'}), 400
+
+@bp.route('/health', methods=['GET'])
+def health_check():
+    """
+    Endpoint para verificar el estado de la aplicación
+    """
+    return jsonify({'status': 'healthy'}), 200

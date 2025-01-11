@@ -34,3 +34,12 @@ ENV/
 uploads/
 .env
 *.log
+
+# Docker
+.docker/
+docker-compose.override.yml
+.env.docker
+
+# Railway
+.railway/
+railway.json
