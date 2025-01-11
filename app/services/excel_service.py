@@ -1,54 +1,37 @@
 import os
-import win32com.client
+import subprocess
 from werkzeug.utils import secure_filename
 
 class ExcelService:
     @staticmethod
     def convert_excel_to_pdf(input_excel_path):
         """
-        Converts Excel file to PDF
+        Converts Excel file to PDF using LibreOffice
         """
         output_pdf_path = os.path.join(
             os.path.dirname(input_excel_path),
             secure_filename(os.path.splitext(os.path.basename(input_excel_path))[0] + '.pdf')
         )
         
-        # Configurar Excel usando win32com
-        excel = win32com.client.Dispatch("Excel.Application")
-        excel.Visible = False
-        
         try:
-            # Abrir el archivo Excel
-            wb = excel.Workbooks.Open(input_excel_path)
-            ws = wb.ActiveSheet
-            
-            # Configurar área de impresión y ajustes
-            ws.PageSetup.Zoom = False
-            ws.PageSetup.FitToPagesWide = 1
-            ws.PageSetup.FitToPagesTall = False
-            ws.PageSetup.PrintArea = "A1:U85"
-            ws.PageSetup.Orientation = 1  # xlPortrait
-            ws.PageSetup.CenterHorizontally = True
-            
-            # Configurar márgenes (en puntos)
-            ws.PageSetup.LeftMargin = excel.InchesToPoints(0.7)
-            ws.PageSetup.RightMargin = excel.InchesToPoints(0.7)
-            ws.PageSetup.TopMargin = excel.InchesToPoints(0.75)
-            ws.PageSetup.BottomMargin = excel.InchesToPoints(0.75)
-            
-            # Exportar a PDF
-            wb.ExportAsFixedFormat(0, output_pdf_path)
+            # Usar LibreOffice para convertir a PDF
+            subprocess.run([
+                'xvfb-run',
+                'libreoffice',
+                '--headless',
+                '--convert-to', 'pdf:calc_pdf_Export',
+                '--outdir', os.path.dirname(output_pdf_path),
+                input_excel_path
+            ], check=True)
             
             return output_pdf_path
             
-        finally:
-            # Cerrar Excel
-            wb.Close(False)
-            excel.Quit()
+        except subprocess.CalledProcessError as e:
+            raise Exception(f"Error converting file: {str(e)}")
 
     @staticmethod
     def allowed_file(filename):
         """Check if the file extension is allowed"""
-        ALLOWED_EXTENSIONS = {'xlsx', 'xls'}
+        ALLOWED_EXTENSIONS = {'xlsx', 'xls', 'ods'}  # Agregado soporte para OpenDocument
         return '.' in filename and \
                filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS

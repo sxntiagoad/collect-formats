@@ -4,30 +4,47 @@ FROM ubuntu:20.04
 ENV DEBIAN_FRONTEND=noninteractive
 
 # Instalar dependencias necesarias
-RUN apt-get update && apt-get install -y \
+RUN dpkg --add-architecture i386 && \
+    apt-get update && \
+    apt-get install -y \
     python3.9 \
     python3-pip \
-    wine64 \
     wget \
-    unzip \
     xvfb \
+    winbind \
+    cabextract \
+    software-properties-common \
     && rm -rf /var/lib/apt/lists/*
+
+# Instalar Wine
+RUN wget -nv -O- https://dl.winehq.org/wine-builds/winehq.key | APT_KEY_DONT_WARN_ON_DANGEROUS_USAGE=1 apt-key add - \
+    && add-apt-repository 'deb https://dl.winehq.org/wine-builds/ubuntu/ focal main' \
+    && apt-get update \
+    && apt-get install -y --install-recommends winehq-stable
 
 # Configurar Wine
 ENV WINEARCH=win64
 ENV WINEPREFIX=/root/.wine
 ENV DISPLAY=:0
 
-# Instalar Office Runtime (necesario para Excel)
-RUN wget https://download.microsoft.com/download/2/7/A/27AF1BE6-DD20-4CB4-B154-EBAB8A7D4A7E/officedeploymenttool_14326-20404.exe \
-    && wine officedeploymenttool_14326-20404.exe /quiet /norestart \
-    && rm officedeploymenttool_14326-20404.exe
+# Instalar winetricks y configurar .NET Framework
+RUN wget https://raw.githubusercontent.com/Winetricks/winetricks/master/src/winetricks \
+    && chmod +x winetricks \
+    && mv winetricks /usr/local/bin \
+    && winetricks -q dotnet48
 
 # Configurar el directorio de trabajo
 WORKDIR /app
 
 # Copiar archivos del proyecto
 COPY . .
+
+# Descargar e instalar Office
+RUN mkdir -p /tmp/office && cd /tmp/office \
+    && wget https://download.microsoft.com/download/2/7/A/27AF1BE6-DD20-4CB4-B154-EBAB8A7D4A7E/officedeploymenttool_16026-20170.exe \
+    && wine officedeploymenttool_16026-20170.exe /quiet /extract:/tmp/office \
+    && wine setup.exe /configure /app/configuration.xml \
+    && cd / && rm -rf /tmp/office
 
 # Instalar dependencias de Python
 RUN pip3 install --no-cache-dir -r requirements.txt
@@ -36,5 +53,8 @@ RUN pip3 install --no-cache-dir -r requirements.txt
 ENV PORT=5000
 EXPOSE $PORT
 
-# Usar el Procfile
-CMD gunicorn run:app --bind 0.0.0.0:$PORT
+# Script de inicio personalizado
+COPY start.sh /start.sh
+RUN chmod +x /start.sh
+
+CMD ["/start.sh"]
